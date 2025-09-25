@@ -31,9 +31,8 @@ export class PrWebCodecsPlayer {
   /**
    * 监听媒体 tag
    */
-  onTag = (e: Tag) => {
+  onTag = (e: Tag<'script' & 'audio' & 'video'>) => {
     const { header, body } = e
-
     const { tagType, timestamp } = header
     switch (tagType) {
       case 'script':
@@ -45,14 +44,15 @@ export class PrWebCodecsPlayer {
       case 'video':
         {
           const { avcPacketType } = body
-
           if (avcPacketType === 0) {
             const { codec = '', data: description } = body
             this.initDecoder({ codec, description })
           }
           if (avcPacketType === 1) {
             const { frameType, data } = body
-            this.decoderWorker.postMessage({ action: 'decode', data: { type: frameType === 1 ? 'key' : 'delta', timestamp, data } })
+            const type = frameType === 1 ? 'key' : 'delta'
+            // const timestamp = (cts + offset_cts) * 1000
+            this.decoderWorker.postMessage({ action: 'decode', data: { type, timestamp, data } })
           }
         }
         break
@@ -62,7 +62,7 @@ export class PrWebCodecsPlayer {
   /**
    * 监听解码结果
    */
-  onDecode = (e: VideoFrame) => {
+  onDecode = (e: any) => {
     this.renderWorker.postMessage({ action: 'push', data: e })
   }
 
@@ -93,7 +93,6 @@ export class PrWebCodecsPlayer {
         this.onDecode(data)
       }
       if (action === 'onError') {
-        console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: error`, e.data)
         this.stop()
       }
     }
@@ -114,6 +113,7 @@ export class PrWebCodecsPlayer {
    * 初始化
    */
   init = async ({ canvas }: { canvas?: HTMLCanvasElement }) => {
+    this.stop()
     this.initDemuxer()
     if (!canvas) {
       canvas = document.createElement('canvas')

@@ -1,80 +1,46 @@
+// 参考 https://www.jianshu.com/p/f667edff9748
+
 const textDecoder = new TextDecoder('utf-8') // 指定编码格式
 
-// 检查是否为AVCC格式
-export const isACVV = (view: DataView, offset: number) => {
-  const u8Array = new Uint8Array(view.buffer.slice(offset, offset + 3))
-  console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: u8Array`, u8Array)
-  const str = textDecoder?.decode(u8Array) || ''
-  console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: str`, str)
-
-  // return data.length >= 4 && data[0] === 0x00 && data[1] === 0x00 && data[2] === 0x00 && data[3] === 0x01
+const getUint24 = (view: DataView, offset: number) => {
+  const num = (view.getUint8(offset) << 16) | (view.getUint8(offset + 1) << 8) | view.getUint8(offset + 2)
+  return num
 }
 
-export const isH264AnnexB = (data: Uint8Array) => {
-  // 检查数据是否足够长（至少包含1字节起始码）
-  if (data.length < 3) return false
-
-  let offset = 0
-
-  while (offset <= data.length - 3) {
-    // 查找起始码：0x000001（3字节）或0x00000001（4字节）
-    if (data[offset] === 0x00 && data[offset + 1] === 0x00 && data[offset + 2] === 0x01) {
-      // 找到3字节起始码，跳过并继续检查后续数据
-      offset += 3
-    } else if (offset + 3 < data.length && data[offset] === 0x00 && data[offset + 1] === 0x00 && data[offset + 2] === 0x00 && data[offset + 3] === 0x01) {
-      // 找到4字节起始码，跳过并继续检查后续数据
-      offset += 4
-    } else {
-      // 未找到起始码，说明不是AnnexB格式
-      return false
-    }
-  }
-
-  // 检查起始码是否出现在数据末尾（无效情况）
-  if (offset === data.length) {
-    return false
-  }
-
-  // 检查起始码后是否为合法的NAL单元头部（1字节）
-  const nalHeader = data[offset]
-  const forbiddenBit = (nalHeader & 0x80) >> 7 // F位（禁止位）
-  const nri = (nalHeader & 0x60) >> 5 // NRI（重要性指示）
-  const type = nalHeader & 0x1f // Type（NAL单元类型）
-
-  // 禁止位必须为0，类型必须在合法范围（1~31）
-  return forbiddenBit === 0 && type >= 1 && type <= 31
-}
-
+// [0,1,2]字节
 export const getSignature = (view: DataView) => {
   const u8Array = new Int8Array(view.buffer, 0, 3)
   return textDecoder?.decode(u8Array) || ''
 }
 
+// [3]字节
 export const getVersion = (view: DataView) => {
-  return `${view.getInt8(3)}`
+  const u8Array = new Int8Array(view.buffer, 3, 1)
+  return u8Array[0]
 }
 
+// [4]字节
 export const getFlags = (view: DataView) => {
   const u8Array = new Int8Array(view.buffer, 4, 1)
   const str = u8Array[0].toString(2).padStart(5, '0')
   const arr = str.split('')
   const [, , video, , audio] = arr
+
   return {
     audio: audio === '1' ? true : false,
     video: video === '1' ? true : false
   }
 }
 
+// [5,6,7,8]字节
 export const getDataOffset = (view: DataView) => {
   return view.getInt32(5)
 }
 
-export const getPreviousTagSize = (view: DataView, offset: number) => {
-  const size = view.getInt32(offset)
-  return size
-}
+// [0,~,8]字节
+export const header = { getSignature, getVersion, getFlags, getDataOffset }
 
-export const checkSurplus = (view: DataView, offset: number) => {
+export const isSurplusTag = (view: DataView, offset: number) => {
   let legal = true // 默认合法
   const length = view.byteLength
 
@@ -88,9 +54,8 @@ export const checkSurplus = (view: DataView, offset: number) => {
   }
   // tagBody 不完整
   else {
-    const _offset = offset + 4 + 11 + 1
-    const dataSize = (view.getUint8(_offset) << 16) | (view.getUint8(_offset + 1) << 8) | view.getUint8(_offset + 2) // 数据长度
-    const needLength = offset + dataSize
+    const dataSize = getUint24(view, offset + 4 + 1) // 数据长度
+    const needLength = offset + 4 + 11 + dataSize
     // 剩余的长度足够
     if (needLength > length) {
       legal = false
@@ -99,6 +64,13 @@ export const checkSurplus = (view: DataView, offset: number) => {
   return legal
 }
 
+// [0,1,2,3]字节
+export const getPreviousTagSize = (view: DataView, offset: number) => {
+  const size = view.getInt32(offset)
+  return size
+}
+
+// [0]字节
 export const getTagType = (view: DataView, offset: number) => {
   const num = view.getInt8(offset)
   let str: 'script' | 'audio' | 'video' = `script`
@@ -113,22 +85,26 @@ export const getTagType = (view: DataView, offset: number) => {
   return str
 }
 
+// [1,2,3]字节
 export const getDataSize = (view: DataView, offset: number) => {
-  const num = (view.getUint8(offset + 1) << 16) | (view.getUint8(offset + 2) << 8) | view.getUint8(offset + 3)
+  const num = getUint24(view, offset + 1)
   return num
 }
 
+// [4,5,6]字节
 export const getTimestamp = (view: DataView, offset: number) => {
-  const num = (view.getUint8(offset + 4) << 16) | (view.getUint8(offset + 5) << 8) | view.getUint8(offset + 6)
+  const num = getUint24(view, offset + 4)
   return num
 }
 
+// [7]字节
 export const getTimestampExtended = (view: DataView, offset: number) => {
   return view.getInt8(offset + 7)
 }
 
+// [8,9,10]字节
 export const getStreamID = (view: DataView, offset: number) => {
-  const num = (view.getUint8(offset + 8) << 16) | (view.getUint8(offset + 9) << 8) | view.getUint8(offset + 10)
+  const num = getUint24(view, offset + 8)
   return num
 }
 
@@ -232,13 +208,23 @@ export const parseMetaData = (view: DataView, offset: number, dataSize: number) 
 }
 
 export const parseAudio = (view: DataView, offset: number, dataSize: number) => {
+  // [0]
   const num = view.getInt8(offset)
   const soundFormat = (num >> 4) & 0x0f // 音频编码格式
   const soundRate = (num >> 2) & 0x03 // 采样率
   const soundSize = (num >> 1) & 0x01 // 采样位数
   const soundType = num & 0x01 // 声道模式
-  const data = new Uint8Array(view.buffer.slice(offset + 1, offset + dataSize))
-  return { soundFormat, soundRate, soundSize, soundType, data }
+
+  // soundFormat === 10 才存在
+  if (soundFormat === 10) {
+    // [1]
+    const accPacketType = view.getInt8(offset + 1)
+    const data = new Uint8Array(view.buffer, offset + 2, dataSize)
+    return { soundFormat, soundRate, soundSize, soundType, accPacketType, data }
+  } else {
+    const data = new Uint8Array(view.buffer, offset + 1, dataSize)
+    return { soundFormat, soundRate, soundSize, soundType, data }
+  }
 }
 
 export const parseVideo = (view: DataView, offset: number, dataSize: number) => {
@@ -251,12 +237,13 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
   const avcPacketType = view.getInt8(offset + 1) // AVC 包类型（仅 H.264）
 
   // [2,3,4]字节
-  const cts = (view.getUint8(offset + 2) << 16) | (view.getUint8(offset + 3) << 8) | view.getUint8(offset + 4)
+  const cts = getUint24(view, offset + 2)
 
   // [5,dataSize]字节
   const data = new Uint8Array(view.buffer.slice(offset + 5, offset + dataSize))
 
-  if (avcPacketType === 0 && codecID === 7) {
+  // h264 config
+  if (codecID === 7 && avcPacketType === 0) {
     // [5]字节
     const version = view.getInt8(offset + 5)
     // [6,7，8]字节
@@ -264,17 +251,11 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
     const arr = Array.from(u8Array, (u) => u.toString(16).padStart(2, '0'))
     const str = arr.join('')
     const codec = `avc1.${str}`
-
-    // const naluLengthSize = view.getInt8(offset + 10)
-    // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: naluLengthSize`, naluLengthSize)
-
     return { frameType, codecID, avcPacketType, cts, data, version, codec }
   }
 
   return { frameType, codecID, avcPacketType, cts, data }
 }
-
-export const header = { getSignature, getVersion, getFlags, getDataOffset }
 
 export const tagHeader = { getTagType, getDataSize, getTimestamp, getTimestampExtended, getStreamID }
 
@@ -282,4 +263,4 @@ export const tagBody = { parseAudio, parseVideo, parseMetaData }
 
 export const tag = { tagHeader, tagBody }
 
-export default { header, getPreviousTagSize, checkSurplus, tag }
+export default { header, getPreviousTagSize, isSurplusTag, tag }

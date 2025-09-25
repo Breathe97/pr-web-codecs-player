@@ -3,8 +3,9 @@ export interface Options {
 }
 
 export class CanvasRender {
-  private underflow = true
-  private pendingFrames: VideoFrame[] = []
+  private isRendering = false
+  // private pendingFrames: VideoFrame[] = []
+  private pendingFrames: { img: ImageBitmap; timestamp: number }[] = []
   private baseTime = 0
 
   offscreenCanvas: OffscreenCanvas | undefined
@@ -22,9 +23,12 @@ export class CanvasRender {
     this.ctx = this.offscreenCanvas.getContext('2d')
   }
 
-  push = (frame: VideoFrame) => {
+  push = (frame: { img: ImageBitmap; timestamp: number }) => {
+    // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->frame: ${frame.timestamp}`, frame.img)
     this.pendingFrames.push(frame)
-    if (this.underflow) setTimeout(this.renderFrame, 0)
+    if (this.isRendering === false) {
+      setTimeout(this.renderFrame, 0)
+    }
   }
 
   calculateTimeUntilNextFrame = (timestamp: number) => {
@@ -34,18 +38,22 @@ export class CanvasRender {
   }
 
   renderFrame = async () => {
-    this.underflow = this.pendingFrames.length == 0
-    if (this.underflow) return
     if (!this.ctx || !this.offscreenCanvas) return
-
     const frame = this.pendingFrames.shift()
-    if (frame) {
-      const timeUntilNextFrame = this.calculateTimeUntilNextFrame(frame.timestamp)
-      await new Promise((r) => setTimeout(r, timeUntilNextFrame))
-      this.ctx.drawImage(frame, 0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height)
-      frame.close()
-      setTimeout(this.renderFrame, 0)
+
+    this.isRendering = Boolean(frame)
+    if (!frame) {
+      this.isRendering = false
+      return
     }
+
+    this.isRendering = true
+    const { img, timestamp } = frame
+    const timeUntilNextFrame = this.calculateTimeUntilNextFrame(timestamp)
+    await new Promise((r) => setTimeout(r, timeUntilNextFrame))
+    this.ctx.drawImage(img, 0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height)
+    img.close()
+    setTimeout(this.renderFrame, 0)
   }
 
   destroy = () => {}

@@ -2,7 +2,7 @@ export type TagType = 'audio' | 'video' | 'script'
 
 export interface Header {
   signature: string
-  version: string
+  version: number
   flags: {
     audio: Boolean
     video: Boolean
@@ -10,39 +10,41 @@ export interface Header {
   dataOffset: number
 }
 
-export interface ScriptTagBody {
-  [key: string]: any
+export interface TagBody {
+  script?: {
+    [key: string]: any
+  }
+  audio?: {
+    soundFormat: string
+    soundRate: string
+    soundSize: string
+    soundType: string
+    data: Uint8Array
+  }
+  video?: {
+    frameType: number
+    codecID: number
+    avcPacketType: number
+    cts: number
+    data: Uint8Array
+    version?: string
+    codec?: string
+  }
 }
 
-export interface AudioTagBody {
-  soundFormat: string
-  soundRate: string
-  soundSize: string
-  soundType: string
-  data: Uint8Array
-}
-
-export interface VideoTagBody {
-  frameType: number
-  codecID: number
-  avcPacketType: number
-  data: Uint8Array
-  codec?: string
-}
-
-export type Tag = {
+export interface Tag<T extends TagType> {
   header: {
-    tagType: TagType
+    tagType: T
     dataSize: number
     timestamp: number
     timestampExtended: number
     streamID: number
   }
-  body: ScriptTagBody & AudioTagBody & VideoTagBody
+  body: TagBody[T]
 }
 
 export interface Options {
   onHeader?: (data: Header) => void
-  onTag?: (data: Tag) => void
+  onTag?: (data: Tag<'script' | 'audio' | 'video'>) => void
   debug?: boolean
 }
