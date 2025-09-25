@@ -15,6 +15,10 @@ export class PrWebCodecsPlayer {
 
   canvas: HTMLCanvasElement | undefined
 
+  stream: MediaStream | undefined
+
+  count = 0
+
   constructor() {}
 
   /**
@@ -29,9 +33,7 @@ export class PrWebCodecsPlayer {
    */
   onTag = (e: Tag) => {
     const { header, body } = e
-    if (header.tagType !== 'audio') {
-      // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: onTag.${header.tagType}.${header.timestamp}`, e.body)
-    }
+
     const { tagType, timestamp } = header
     switch (tagType) {
       case 'script':
@@ -50,7 +52,7 @@ export class PrWebCodecsPlayer {
           }
           if (avcPacketType === 1) {
             const { frameType, data } = body
-            this.decoderWorker.postMessage({ action: 'decode', data: { type: frameType === 1 ? 'key' : 'delta', timestamp: timestamp * 1000, data } })
+            this.decoderWorker.postMessage({ action: 'decode', data: { type: frameType === 1 ? 'key' : 'delta', timestamp, data } })
           }
         }
         break
@@ -61,7 +63,6 @@ export class PrWebCodecsPlayer {
    * 监听解码结果
    */
   onDecode = (e: VideoFrame) => {
-    console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: push`, e.timestamp)
     this.renderWorker.postMessage({ action: 'push', data: e })
   }
 
@@ -105,7 +106,6 @@ export class PrWebCodecsPlayer {
     if (!this.canvas) return
     this.canvas.width = width
     this.canvas.height = height
-    console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: initRender`, width, height)
     const offscreenCanvas = this.canvas.transferControlToOffscreen()
     this.renderWorker.postMessage({ action: 'init', data: { offscreenCanvas } }, [offscreenCanvas])
   }
@@ -120,8 +120,8 @@ export class PrWebCodecsPlayer {
     }
     this.canvas = canvas
     // 捕获画布流
-    const stream = this.canvas.captureStream(25)
-    return stream
+    this.stream = this.canvas.captureStream(25)
+    return this.stream
   }
 
   /**
@@ -132,18 +132,22 @@ export class PrWebCodecsPlayer {
       const res = await this.prFetch.get(url)
       const reader = res.body?.getReader()
       if (!reader) throw new Error('Reader is error.')
-      window.count = 0
+      this.count = 0
       while (true) {
         const { done, value } = await reader.read()
-        // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: value`, value)
         if (value) {
-          window.count++
+          this.count = this.count + 1
           this.demuxerWorker.postMessage({ action: 'push', data: value })
         }
-        if (window.count >= 7) {
+
+        if (done) {
+          this.demuxerWorker.postMessage({ action: 'flush', data: value })
+          break
+        }
+
+        if (this.count >= 18) {
           // break
         }
-        if (done) break
       }
     } catch (error) {
       console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: error`, error)
@@ -156,6 +160,11 @@ export class PrWebCodecsPlayer {
   stop = () => {
     this.prFetch.stop()
     this.demuxerWorker.postMessage({ action: 'destroy' })
+    this.decoderWorker.postMessage({ action: 'destroy' })
     this.renderWorker.postMessage({ action: 'destroy' })
+    const tracks = this.stream?.getTracks() || []
+    for (const track of tracks) {
+      track.stop()
+    }
   }
 }

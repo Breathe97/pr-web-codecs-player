@@ -31,12 +31,11 @@ const videoRef = ref<HTMLVideoElement>()
 
 // url.value = 'https://stream.quickvo.live/stream_8054007535/1758596620533.flv?auth_key=1758683020-0-0-51047f654d7a94eab237fb896ed8d57c'
 
-let player: PrWebCodecsPlayer
+const player = new PrWebCodecsPlayer()
 
 const init = async () => {
   await nextTick()
   if (!videoRef.value || !canvasRef.value) return
-  player = new PrWebCodecsPlayer()
   const stream = await player.init({ canvas: canvasRef.value })
   videoRef.value.srcObject = stream
   videoRef.value?.load()

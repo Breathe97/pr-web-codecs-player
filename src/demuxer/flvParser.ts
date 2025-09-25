@@ -10,6 +10,41 @@ export const isACVV = (view: DataView, offset: number) => {
   // return data.length >= 4 && data[0] === 0x00 && data[1] === 0x00 && data[2] === 0x00 && data[3] === 0x01
 }
 
+export const isH264AnnexB = (data: Uint8Array) => {
+  // 检查数据是否足够长（至少包含1字节起始码）
+  if (data.length < 3) return false
+
+  let offset = 0
+
+  while (offset <= data.length - 3) {
+    // 查找起始码：0x000001（3字节）或0x00000001（4字节）
+    if (data[offset] === 0x00 && data[offset + 1] === 0x00 && data[offset + 2] === 0x01) {
+      // 找到3字节起始码，跳过并继续检查后续数据
+      offset += 3
+    } else if (offset + 3 < data.length && data[offset] === 0x00 && data[offset + 1] === 0x00 && data[offset + 2] === 0x00 && data[offset + 3] === 0x01) {
+      // 找到4字节起始码，跳过并继续检查后续数据
+      offset += 4
+    } else {
+      // 未找到起始码，说明不是AnnexB格式
+      return false
+    }
+  }
+
+  // 检查起始码是否出现在数据末尾（无效情况）
+  if (offset === data.length) {
+    return false
+  }
+
+  // 检查起始码后是否为合法的NAL单元头部（1字节）
+  const nalHeader = data[offset]
+  const forbiddenBit = (nalHeader & 0x80) >> 7 // F位（禁止位）
+  const nri = (nalHeader & 0x60) >> 5 // NRI（重要性指示）
+  const type = nalHeader & 0x1f // Type（NAL单元类型）
+
+  // 禁止位必须为0，类型必须在合法范围（1~31）
+  return forbiddenBit === 0 && type >= 1 && type <= 31
+}
+
 export const getSignature = (view: DataView) => {
   const u8Array = new Int8Array(view.buffer, 0, 3)
   return textDecoder?.decode(u8Array) || ''
@@ -229,10 +264,14 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
     const arr = Array.from(u8Array, (u) => u.toString(16).padStart(2, '0'))
     const str = arr.join('')
     const codec = `avc1.${str}`
+
+    // const naluLengthSize = view.getInt8(offset + 10)
+    // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: naluLengthSize`, naluLengthSize)
+
     return { frameType, codecID, avcPacketType, cts, data, version, codec }
   }
 
-  return { frameType, codecID, avcPacketType, data }
+  return { frameType, codecID, avcPacketType, cts, data }
 }
 
 export const header = { getSignature, getVersion, getFlags, getDataOffset }

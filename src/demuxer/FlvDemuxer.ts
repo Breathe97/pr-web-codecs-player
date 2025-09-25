@@ -1,5 +1,5 @@
-import flvParser from './flvParser'
-import { Header, Options, TagType, ScriptTagBody } from './type'
+import flvParser, { isH264AnnexB } from './flvParser'
+import { Header, Options, TagType } from './type'
 
 export class FlvDemuxer {
   private pushFuncs: Function[] = []
@@ -7,13 +7,14 @@ export class FlvDemuxer {
   private offset = 0
   private is_parsing = false // 是否正在解析
   private header: Header | undefined
-  private metadata: ScriptTagBody = {}
   private tag: any
 
   private onHeader
   private onTag
 
   debug = false
+
+  parseTimer = 0
 
   constructor({ onHeader, onTag, debug = false }: Options) {
     this.onHeader = onHeader
@@ -27,10 +28,10 @@ export class FlvDemuxer {
     this.offset = 0
     this.is_parsing = false
     this.header = undefined
-    this.metadata = {}
     this.tag = undefined
+    this.parseTimer = setInterval(this.parse, 40)
     if (this.debug) {
-      console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: init`)
+      console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->FlvDemuxer: init`)
     }
   }
 
@@ -40,10 +41,10 @@ export class FlvDemuxer {
     this.offset = 0
     this.is_parsing = false
     this.header = undefined
-    this.metadata = {}
     this.tag = undefined
+    clearInterval(this.parseTimer)
     if (this.debug) {
-      console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: destroy`)
+      console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->FlvDemuxer: destroy`)
     }
   }
 
@@ -56,30 +57,29 @@ export class FlvDemuxer {
       this.payload = _payload
     }
     this.pushFuncs.push(func)
-    this.parse()
   }
 
-  private parse = () => {
-    if (this.is_parsing || this.pushFuncs.length === 0) return
+  private parse = async () => {
+    if (this.pushFuncs.length === 0 || this.is_parsing === true) return
+
     this.is_parsing = true
 
     {
-      this.pushFuncs[0]()
-      this.pushFuncs.splice(0, 1)
-      // if (this.debug) {
-      //   console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: parse`, this.payload)
-      // }
+      const pushFunc = this.pushFuncs.shift()
+      pushFunc && pushFunc()
     }
+
+    // const a = isH264AnnexB(this.payload)
+    // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: isH264AnnexB`, a)
 
     const view = new DataView(this.payload.buffer)
 
     if (!this.header) {
       this.parseHeader(view)
     }
-    this.parseTag(view)
+    await this.parseTag(view)
 
     this.is_parsing = false
-    this.parse()
   }
 
   private parseHeader = (view: DataView) => {
@@ -92,12 +92,12 @@ export class FlvDemuxer {
     this.offset = this.header?.dataOffset
     this.onHeader && this.onHeader(this.header)
     if (this.debug) {
-      console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: header`, this.header)
+      console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->FlvDemuxer: header`, this.header)
     }
     return this.header
   }
 
-  private parseTag = (view: DataView) => {
+  private parseTag = async (view: DataView) => {
     const parseTagHeader = (view: DataView, offset: number) => {
       const obj = {
         tagType: flvParser.tag.tagHeader.getTagType(view, offset),
@@ -107,7 +107,7 @@ export class FlvDemuxer {
         streamID: flvParser.tag.tagHeader.getStreamID(view, offset)
       }
       if (this.debug) {
-        console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: parseTagHeader`, obj)
+        console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->FlvDemuxer: parseTagHeader`, obj)
       }
       return obj
     }
@@ -134,7 +134,7 @@ export class FlvDemuxer {
           break
       }
       if (this.debug) {
-        console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: parseTagBody`, tagBody)
+        console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->FlvDemuxer: parseTagBody`, tagBody)
       }
       return tagBody
     }
@@ -153,9 +153,13 @@ export class FlvDemuxer {
       const tagBody = parseTagBody(tagType, view, this.offset + 4 + 11, dataSize) // previousTagSize(4) tagHeader(11)
 
       this.tag = { header: tagHeader, body: tagBody }
+      if (tagHeader.tagType !== 'audio') {
+        console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: tag.${tagHeader.timestamp}`, tagBody)
+      }
       this.onTag && this.onTag(this.tag)
 
       this.offset = this.offset + 4 + 11 + dataSize // previousTagSize(4) tagHeader(11) tagBody(dataSize)
+      await new Promise((resolve) => setTimeout(() => resolve(true), 100))
     }
   }
 }

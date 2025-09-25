@@ -1,8 +1,6 @@
 import { CanvasRender } from './CanvasRender'
 
 const render = new CanvasRender({
-  onFrame: (data) => postMessage({ action: 'onFrame', data }),
-  onError: (data) => postMessage({ action: 'onError', data }),
   debug: false
 })
 

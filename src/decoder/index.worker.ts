@@ -24,5 +24,10 @@ onmessage = (event) => {
         decoder.decode(data)
       }
       break
+    case 'flush':
+      {
+        decoder.decode(data)
+      }
+      break
   }
 }

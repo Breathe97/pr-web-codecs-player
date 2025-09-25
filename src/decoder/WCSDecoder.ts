@@ -7,6 +7,8 @@ export interface Options {
 export class WCSDecoder {
   private decoder: VideoDecoder | undefined
 
+  config: VideoDecoderConfig | undefined
+
   private onDecode
   private onError
 
@@ -19,8 +21,10 @@ export class WCSDecoder {
   }
 
   init = (config: VideoDecoderConfig) => {
+    this.config = config
     this.decoder = new VideoDecoder({
       output: (e: VideoFrame) => {
+        console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: output`, e)
         this.onDecode && this.onDecode(e)
       },
       error: (e) => {
@@ -28,15 +32,21 @@ export class WCSDecoder {
         this.onError && this.onError(e)
       }
     })
+    console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: config`, config)
     this.decoder.configure(config)
   }
 
   decode = async (init: EncodedVideoChunkInit) => {
+    if (!this.decoder) return
     const chunk = new EncodedVideoChunk(init)
-    // if (init.type === 'key') {
-    //   await this.decoder?.flush()
-    // }
-    this.decoder?.decode(chunk)
+    console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: this.decoder.decodeQueueSize`, this.decoder.decodeQueueSize)
+    if (this.decoder.decodeQueueSize < 2) {
+      this.decoder.decode(chunk)
+    }
+  }
+
+  flush = () => {
+    this.decoder?.flush()
   }
 
   destroy = () => {

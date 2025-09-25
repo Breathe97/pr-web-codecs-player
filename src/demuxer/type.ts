@@ -11,9 +11,6 @@ export interface Header {
 }
 
 export interface ScriptTagBody {
-  width: number
-  height: number
-  fps: number
   [key: string]: any
 }
 
