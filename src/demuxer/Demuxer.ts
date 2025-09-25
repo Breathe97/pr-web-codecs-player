@@ -1,7 +1,7 @@
 import flvParser from './flv264Parser'
 import { Header, Options, TagType } from './type'
 
-export class FlvDemuxer {
+export class Demuxer {
   private pushFuncs: Function[] = []
   private payload = new Uint8Array(0)
   private offset = 0
@@ -23,23 +23,18 @@ export class FlvDemuxer {
   }
 
   init = () => {
-    this.pushFuncs = []
-    this.payload = new Uint8Array(0)
-    this.offset = 0
-    this.is_parsing = false
-    this.header = undefined
-    this.tag = undefined
+    this.destroy()
     this.parseTimer = setInterval(this.parse, 10)
   }
 
   destroy = () => {
+    clearInterval(this.parseTimer)
     this.pushFuncs = []
     this.payload = new Uint8Array(0)
     this.offset = 0
     this.is_parsing = false
     this.header = undefined
     this.tag = undefined
-    clearInterval(this.parseTimer)
   }
 
   push = (payload: Uint8Array) => {
@@ -99,7 +94,6 @@ export class FlvDemuxer {
 
     const parseTagBody = (tagType: TagType, view: DataView, offset: number, dataSize: number) => {
       let tagBody
-
       switch (tagType) {
         case 'script':
           {
@@ -132,6 +126,8 @@ export class FlvDemuxer {
       const tagHeader = parseTagHeader(view, this.offset + 4) // previousTagSize(4)
 
       const { tagType, dataSize } = tagHeader
+
+      if (!tagType) break
 
       const tagBody = parseTagBody(tagType, view, this.offset + 4 + 11, dataSize) // previousTagSize(4) tagHeader(11)
       // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: tagBody`, tagBody)

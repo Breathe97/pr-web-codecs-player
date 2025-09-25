@@ -150,7 +150,7 @@ export class PrWebCodecsPlayer {
         }
       }
     } catch (error) {
-      console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: error`, error)
+      // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: error`, error)
     }
   }
 
@@ -164,6 +164,7 @@ export class PrWebCodecsPlayer {
     this.renderWorker.postMessage({ action: 'destroy' })
     const tracks = this.stream?.getTracks() || []
     for (const track of tracks) {
+      track.enabled = false
       track.stop()
     }
   }

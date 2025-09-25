@@ -1,26 +1,28 @@
-export interface Options {
-  debug?: boolean
-}
-
 export class CanvasRender {
   private isRendering = false
-  // private pendingFrames: VideoFrame[] = []
   private pendingFrames: { img: ImageBitmap; timestamp: number }[] = []
   private baseTime = 0
 
-  offscreenCanvas: OffscreenCanvas | undefined
+  private offscreenCanvas: OffscreenCanvas | undefined
 
-  ctx: OffscreenCanvasRenderingContext2D | null | undefined | CanvasRenderingContext2D
+  private ctx: OffscreenCanvasRenderingContext2D | null | undefined | CanvasRenderingContext2D
 
   debug = false
 
-  constructor({ debug = false }: Options) {
-    this.debug = debug
-  }
+  constructor() {}
 
   init = ({ offscreenCanvas }: { offscreenCanvas: OffscreenCanvas }) => {
+    this.destroy()
     this.offscreenCanvas = offscreenCanvas
     this.ctx = this.offscreenCanvas.getContext('2d')
+  }
+
+  destroy = () => {
+    this.isRendering = false
+    this.pendingFrames = []
+    this.baseTime = 0
+    this.offscreenCanvas = undefined
+    this.ctx = undefined
   }
 
   push = (frame: { img: ImageBitmap; timestamp: number }) => {
@@ -55,6 +57,4 @@ export class CanvasRender {
     img.close()
     setTimeout(this.renderFrame, 0)
   }
-
-  destroy = () => {}
 }

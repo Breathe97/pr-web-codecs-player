@@ -1,30 +1,26 @@
 export interface Options {
   onDecode?: (data: { img: ImageBitmap; timestamp: number }) => void
   onError?: (data: DOMException) => void
-  debug?: boolean
 }
 
 export class WCSDecoder {
+  private config: VideoDecoderConfig | undefined
+
   private decoder: VideoDecoder | undefined
 
-  config: VideoDecoderConfig | undefined
-
-  hasKeyFrame = false
+  private hasKeyFrame = false
 
   private onDecode
   private onError
 
-  debug = false
-
-  constructor({ onDecode, onError, debug = false }: Options) {
+  constructor({ onDecode, onError }: Options) {
     this.onDecode = onDecode
     this.onError = onError
-    this.debug = debug
   }
 
   init = (config: VideoDecoderConfig) => {
+    this.destroy()
     this.config = { ...config }
-    this.hasKeyFrame = false
     this.decoder = new VideoDecoder({
       output: async (frame: VideoFrame) => {
         // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: frame`, frame)
@@ -43,7 +39,7 @@ export class WCSDecoder {
         this.onError && this.onError(e)
       }
     })
-    console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: configure`, this.config)
+    console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->WCSDecoder: configure`, this.config)
     this.decoder.configure(this.config)
   }
 
@@ -63,6 +59,7 @@ export class WCSDecoder {
   }
 
   destroy = () => {
+    this.config = undefined
     this.decoder?.close()
     this.decoder = undefined
     this.hasKeyFrame = false

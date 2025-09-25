@@ -73,8 +73,11 @@ export const getPreviousTagSize = (view: DataView, offset: number) => {
 // [0]字节
 export const getTagType = (view: DataView, offset: number) => {
   const num = view.getInt8(offset)
-  let str: 'script' | 'audio' | 'video' = `script`
+  let str: 'script' | 'audio' | 'video' | undefined
   switch (num) {
+    case 18:
+      str = 'script'
+      break
     case 8:
       str = 'audio'
       break

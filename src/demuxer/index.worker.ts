@@ -1,6 +1,6 @@
-import { FlvDemuxer } from './FlvDemuxer'
+import { Demuxer } from './Demuxer'
 
-const demuxer = new FlvDemuxer({
+const demuxer = new Demuxer({
   onHeader: (data) => postMessage({ action: 'onHeader', data }),
   onTag: (data) => postMessage({ action: 'onTag', data }),
   debug: false
