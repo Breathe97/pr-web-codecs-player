@@ -322,30 +322,121 @@ export const parseAudio = (view: DataView, offset: number, dataSize: number) => 
 }
 
 export const parseVideo = (view: DataView, offset: number, dataSize: number) => {
+  let currentOffset = offset
   // [0]字节
-  const num = view.getInt8(offset)
+  const num = view.getInt8(currentOffset)
   const frameType = (num >> 4) & 0x0f // 帧类型
   const codecID = num & 0x0f // 视频编码格式
+  currentOffset = currentOffset + 1
 
   // [1]字节
-  const avcPacketType = view.getInt8(offset + 1) // AVC 包类型（仅 H.264）
+  const avcPacketType = view.getInt8(currentOffset) // AVC 包类型（仅 H.264）
+  currentOffset = currentOffset + 1
 
   // [2,3,4]字节
-  const cts = getUint24(view, offset + 2)
+  const cts = getUint24(view, currentOffset)
+  currentOffset = currentOffset + 3
 
   // [5,dataSize]字节
-  const data = new Uint8Array(view.buffer.slice(offset + 5, offset + dataSize))
+  const data = new Uint8Array(view.buffer, currentOffset, dataSize - 5)
 
-  // h264 config
-  if (codecID === 7 && avcPacketType === 0) {
-    // [5]字节
-    const version = view.getInt8(offset + 5)
-    // [6,7，8]字节
-    const u8Array = new Uint8Array(view.buffer.slice(offset + 6, offset + 9))
-    const arr = Array.from(u8Array, (u) => u.toString(16).padStart(2, '0'))
-    const str = arr.join('')
-    const codec = `avc1.${str}`
-    return { frameType, codecID, avcPacketType, cts, data, version, codec }
+  switch (codecID) {
+    case 7: // H.264 AVCC
+      {
+        // config sps pps
+        if (avcPacketType === 0) {
+          console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: ${currentOffset}`, data)
+          // [0]字节 固定为1（H.264标准要求）
+          const version = view.getInt8(currentOffset)
+          currentOffset = currentOffset + 1
+          if (version !== 1) throw new Error('Invalid AVC version')
+
+          // [1]字节 编码档次（Profile），如0x64=High Profile、0x66=Baseline Profile
+          const profile = view.getInt8(currentOffset) & 0xff
+          currentOffset = currentOffset + 1
+
+          // [2]字节 兼容性标志（与Profile配合使用）
+          const compatibility = view.getInt8(currentOffset) & 0xff
+          currentOffset = currentOffset + 1
+
+          // [3]字节 编码级别（Level），如0x31=3.1 Level
+          const level = view.getInt8(currentOffset) & 0xff
+          currentOffset = currentOffset + 1
+
+          const arr = Array.from([profile, compatibility, level], (item) => item.toString(16).padStart(2, '0'))
+          const str = arr.join('')
+          const codec = `avc1.${str}`
+
+          // [4]字节 低2位 NALU长度前缀的字节数减1（如0x03=4字节长度前缀）
+          const lengthSizeMinusOne = (view.getInt8(currentOffset) & 0x03) - 1
+          currentOffset = currentOffset + 1
+
+          // [5]字节 低5位 SPS数量（通常为1）
+          const numOfSequenceParameterSets = view.getUint8(currentOffset) & 0x1f
+          currentOffset = currentOffset + 1
+
+          // [6，7]字节 SPS的总长度（大端序）
+          const sequenceParameterSetLength = view.getInt16(currentOffset, false)
+          currentOffset = currentOffset + 2
+
+          // [8,...sequenceParameterSetLength]字节 SPS数据（长度为sequenceParameterSetLength）
+          const sps = new Uint8Array(view.buffer, currentOffset, sequenceParameterSetLength)
+          currentOffset = currentOffset + sequenceParameterSetLength
+
+          // [0]字节 低5位 PPS数量（通常为1）
+          const numOfPictureParameterSets = view.getInt8(currentOffset) & 0x1f
+          currentOffset = currentOffset + 1
+
+          // [1,2]字节 PPS的总长度（大端序）
+          const pictureParameterSetLength = view.getInt16(currentOffset, false)
+          currentOffset = currentOffset + 2
+
+          // [3,...pictureParameterSetLength]字节	PPS数据（长度为pictureParameterSetLength）
+          const pps = new Uint8Array(view.buffer, currentOffset, pictureParameterSetLength)
+          currentOffset = currentOffset + pictureParameterSetLength
+
+          return { frameType, codecID, avcPacketType, cts, data, version, codec, profile, compatibility, level, lengthSizeMinusOne, numOfSequenceParameterSets, sequenceParameterSetLength, sps, numOfPictureParameterSets, pictureParameterSetLength, pps }
+        }
+        // nalu
+        else if (avcPacketType === 1) {
+          const nalus = []
+
+          let startIndex = currentOffset
+
+          const maxSize = currentOffset + dataSize - 5
+
+          // 查找为 00 00 03的结束码进行分割
+          while (currentOffset + 4 < maxSize) {
+            const isEnd = view.getInt8(currentOffset) === 0 && view.getInt8(currentOffset + 1) === 0 && view.getInt8(currentOffset + 2) === 0x03
+            if (isEnd) {
+              let _startIndex = startIndex
+              if (nalus.length !== 0) {
+                _startIndex = _startIndex + 3
+              }
+              const u8Array = new Uint8Array(view.buffer.slice(_startIndex, currentOffset))
+
+              // 判断是否为有效的 nalu头
+              const isEffective = u8Array[0] === 0x00 && u8Array[1] === 0x00
+              if (isEffective) {
+                const byte = u8Array[4]
+                const forbidden_zero_bit = (byte >> 7) & 0x01 // 提取第7位，结果为0
+                const nal_ref_idc = (byte >> 5) & 0x03 // 提取第6-7位，结果为1（不可丢弃）
+                const nal_unit_type = byte & 0x1f // 提取第0-4位，结果为5（IDR帧）
+
+                nalus.push({ forbidden_zero_bit, nal_ref_idc, nal_unit_type, payload: u8Array })
+              }
+              startIndex = currentOffset
+            }
+            currentOffset = currentOffset + 1
+          }
+          // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->nalus: ${dataSize}`, nalus)
+        }
+      }
+      break
+
+    default: {
+      throw new Error('Unsupported codecID')
+    }
   }
 
   return { frameType, codecID, avcPacketType, cts, data }

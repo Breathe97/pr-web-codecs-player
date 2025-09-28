@@ -24,7 +24,7 @@ export class Demuxer {
 
   init = () => {
     this.destroy()
-    this.parseTimer = setInterval(this.parse, 10)
+    this.parseTimer = setInterval(this.parse, 8)
   }
 
   destroy = () => {
@@ -55,6 +55,7 @@ export class Demuxer {
     {
       const pushFunc = this.pushFuncs.shift()
       pushFunc && pushFunc()
+      // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: this.pushFuncs`, this.pushFuncs.length)
     }
     const view = new DataView(this.payload.buffer)
 
@@ -117,7 +118,7 @@ export class Demuxer {
     while (this.offset < view.byteLength) {
       const isSurplus = flvParser.isSurplusTag(view, this.offset) // 判断后续数据是否是完整tag 如果不是则跳出本次解析 等待后续数据
       if (isSurplus === false) {
-        this.payload = this.payload.slice(this.offset) // 从上次header前截取
+        this.payload = this.payload.slice(this.offset) // 后续数据长度不足 跳出合并下一段数据
         this.offset = 0 // 重置为0
         break
       }
