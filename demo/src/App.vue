@@ -54,7 +54,7 @@ const init = async () => {
 }
 
 const changeUrl = () => {
-  url.value = 'https://stream.quickvo.live/stream_39fbef9e-8757-4922-b119-d909a45a73b9/1759025822588.flv?auth_key=1759112222-0-0-56d788c14da71f570dc05d8018a401bf'
+  url.value = 'https://stream.quickvo.live/stream_39fbef9e-8757-4922-b119-d909a45a73b9/1759053396681.flv?auth_key=1759139796-0-0-06e01da836a7e722dd282713acf5900b'
 }
 
 const play = async () => {

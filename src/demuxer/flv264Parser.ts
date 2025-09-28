@@ -3,6 +3,26 @@
 
 const textDecoder = new TextDecoder('utf-8') // 指定编码格式
 
+export const isNalStart = (view: DataView, offset: number) => {
+  {
+    const is = view.getInt8(offset) === 0 && view.getInt8(offset + 1) === 0 && view.getInt8(offset + 2) === 0 && view.getInt8(offset + 3) === 0x01
+    if (is) return 4
+  }
+  {
+    const is = view.getInt8(offset) === 0 && view.getInt8(offset + 1) === 0 && view.getInt8(offset + 2) === 0x01
+    if (is) return 3
+  }
+  return 0
+}
+
+export const getNalInfo = (view: DataView, offset: number) => {
+  const num = view.getInt8(offset)
+  const forbidden_zero_bit = (num >> 7) & 0x01 // 提取第7位，结果为0
+  const nal_ref_idc = (num >> 5) & 0x03 // 提取第6-7位，结果为1（不可丢弃）
+  const nal_unit_type = num & 0x1f // 提取第0-4位，结果为5（IDR帧）
+  return { forbidden_zero_bit, nal_ref_idc, nal_unit_type }
+}
+
 export const getAmfType = (view: DataView, offset: number) => {
   const amfType = view.getUint8(offset)
   return amfType
@@ -345,7 +365,6 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
       {
         // config sps pps
         if (avcPacketType === 0) {
-          console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: ${currentOffset}`, data)
           // [0]字节 固定为1（H.264标准要求）
           const version = view.getInt8(currentOffset)
           currentOffset = currentOffset + 1
@@ -381,6 +400,10 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
 
           // [8,...sequenceParameterSetLength]字节 SPS数据（长度为sequenceParameterSetLength）
           const sps = new Uint8Array(view.buffer, currentOffset, sequenceParameterSetLength)
+          {
+            const obj = getNalInfo(view, currentOffset)
+            // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: sps`, obj)
+          }
           currentOffset = currentOffset + sequenceParameterSetLength
 
           // [0]字节 低5位 PPS数量（通常为1）
@@ -393,12 +416,17 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
 
           // [3,...pictureParameterSetLength]字节	PPS数据（长度为pictureParameterSetLength）
           const pps = new Uint8Array(view.buffer, currentOffset, pictureParameterSetLength)
+          {
+            const obj = getNalInfo(view, currentOffset)
+            // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: pps`, obj)
+          }
           currentOffset = currentOffset + pictureParameterSetLength
 
           return { frameType, codecID, avcPacketType, cts, data, version, codec, profile, compatibility, level, lengthSizeMinusOne, numOfSequenceParameterSets, sequenceParameterSetLength, sps, numOfPictureParameterSets, pictureParameterSetLength, pps }
         }
-        // nalu
+        // video data
         else if (avcPacketType === 1) {
+          // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: data`, data)
           const nalus = []
 
           let startIndex = currentOffset
@@ -407,26 +435,48 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
 
           // 查找为 00 00 03的结束码进行分割
           while (currentOffset + 4 < maxSize) {
-            const isEnd = view.getInt8(currentOffset) === 0 && view.getInt8(currentOffset + 1) === 0 && view.getInt8(currentOffset + 2) === 0x03
-            if (isEnd) {
-              let _startIndex = startIndex
-              if (nalus.length !== 0) {
-                _startIndex = _startIndex + 3
-              }
-              const u8Array = new Uint8Array(view.buffer.slice(_startIndex, currentOffset))
+            // const isEnd = view.getInt8(currentOffset) === 0 && view.getInt8(currentOffset + 1) === 0 && view.getInt8(currentOffset + 2) === 0x03
+            const isNal = isNalStart(view, currentOffset)
+            currentOffset = currentOffset + isNal
 
-              // 判断是否为有效的 nalu头
-              const isEffective = u8Array[0] === 0x00 && u8Array[1] === 0x00
-              if (isEffective) {
-                const byte = u8Array[4]
-                const forbidden_zero_bit = (byte >> 7) & 0x01 // 提取第7位，结果为0
-                const nal_ref_idc = (byte >> 5) & 0x03 // 提取第6-7位，结果为1（不可丢弃）
-                const nal_unit_type = byte & 0x1f // 提取第0-4位，结果为5（IDR帧）
+            if (isNal) {
+              const obj = getNalInfo(view, currentOffset)
+              currentOffset = currentOffset + 1
 
-                nalus.push({ forbidden_zero_bit, nal_ref_idc, nal_unit_type, payload: u8Array })
+              if (obj.nal_unit_type === 6) {
+                let payloadType = 0
+                while (view.getInt8(currentOffset) === 0xff) {
+                  payloadType = payloadType + 0xff
+                  currentOffset = currentOffset + 1
+                }
+
+                let payloadSize = 0
+                while (view.getInt8(currentOffset) === 0xff) {
+                  payloadSize = payloadSize + 0xff
+                  currentOffset = currentOffset + 1
+                }
+
+                const payloadData = new Uint8Array(view.buffer.slice(currentOffset, payloadSize))
+                console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: ${payloadType}.${payloadSize}`, payloadData)
               }
-              startIndex = currentOffset
             }
+
+            // if (isEnd) {
+            //   let _startIndex = startIndex
+            //   if (nalus.length !== 0) {
+            //     _startIndex = _startIndex + 3
+            //   }
+            //   const u8Array = new Uint8Array(view.buffer.slice(_startIndex, currentOffset))
+
+            //   // 判断是否为有效的 nalu头
+            //   const isEffective = u8Array[0] === 0x00 && u8Array[1] === 0x00
+            //   if (isEffective) {
+            //     const obj = getNalInfo(view, currentOffset + 4)
+            //     console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: obj`, obj.nal_unit_type)
+            //     nalus.push({ ...obj, payload: u8Array })
+            //   }
+            //   startIndex = currentOffset
+            // }
             currentOffset = currentOffset + 1
           }
           // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->nalus: ${dataSize}`, nalus)
