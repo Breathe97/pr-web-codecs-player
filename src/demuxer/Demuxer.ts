@@ -56,7 +56,6 @@ export class Demuxer {
       const pushFunc = this.pushFuncs.shift()
       pushFunc && pushFunc()
     }
-
     const view = new DataView(this.payload.buffer)
 
     if (!this.header) {
@@ -98,6 +97,7 @@ export class Demuxer {
         case 'script':
           {
             tagBody = flvParser.tag.tagBody.parseMetaData(view, offset, dataSize)
+            console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: parseMetaData`, Object.keys(tagBody.value).length, tagBody)
           }
           break
         case 'audio':
