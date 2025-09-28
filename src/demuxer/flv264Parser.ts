@@ -296,9 +296,9 @@ export const parseMetaData = (view: DataView, offset: number, dataSize: number) 
   currentOffset = currentOffset + 1
 
   // 递归解析
-  const value = getAMFValue(view, currentOffset, amfType)
+  const res = getAMFValue(view, currentOffset, amfType)
 
-  return value
+  return res.value
 }
 
 export const parseAudio = (view: DataView, offset: number, dataSize: number) => {

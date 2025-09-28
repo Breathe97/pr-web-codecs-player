@@ -38,12 +38,10 @@ const init = async () => {
   if (!canvas_view || !video_view) return
 
   const canvas_dom = document.createElement('canvas')
-  canvas_dom.style.width = '100%'
   canvas_dom.style.height = '100%'
   canvas_view.replaceChildren(canvas_dom)
 
   const video_dom = document.createElement('video')
-  video_dom.style.width = '100%'
   video_dom.style.height = '100%'
   video_dom.style.objectFit = 'cover'
   video_view.replaceChildren(video_dom)
@@ -96,7 +94,6 @@ const stop = () => {
 }
 
 #canvas-view canvas {
-  width: 100%;
   height: 100%;
 }
 
