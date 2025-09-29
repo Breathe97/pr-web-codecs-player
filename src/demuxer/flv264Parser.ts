@@ -1,25 +1,28 @@
 // 参考 https://www.jianshu.com/p/f667edff9748
 // 参考 https://www.cnblogs.com/yaozhongxiao/archive/2013/04/12/3016302.html
+// 参考 https://blog.csdn.net/shaosunrise/article/details/121548065
+
+import { Nalu } from './type'
 
 const textDecoder = new TextDecoder('utf-8') // 指定编码格式
 
 export const isNalStart = (view: DataView, offset: number) => {
   {
-    const is = view.getInt8(offset) === 0 && view.getInt8(offset + 1) === 0 && view.getInt8(offset + 2) === 0 && view.getInt8(offset + 3) === 0x01
+    const is = view.getUint8(offset) === 0 && view.getUint8(offset + 1) === 0 && view.getUint8(offset + 2) === 0 && view.getUint8(offset + 3) === 0x01
     if (is) return 4
   }
   {
-    const is = view.getInt8(offset) === 0 && view.getInt8(offset + 1) === 0 && view.getInt8(offset + 2) === 0x01
+    const is = view.getUint8(offset) === 0 && view.getUint8(offset + 1) === 0 && view.getUint8(offset + 2) === 0x01
     if (is) return 3
   }
   return 0
 }
 
-export const getNalInfo = (view: DataView, offset: number) => {
-  const num = view.getInt8(offset)
-  const forbidden_zero_bit = (num >> 7) & 0x01 // 提取第7位，结果为0
-  const nal_ref_idc = (num >> 5) & 0x03 // 提取第6-7位，结果为1（不可丢弃）
-  const nal_unit_type = num & 0x1f // 提取第0-4位，结果为5（IDR帧）
+export const getNaluHeader = (view: DataView, offset: number) => {
+  const num = view.getUint8(offset)
+  const forbidden_zero_bit = (num >> 7) & 0x01 // 必为0
+  const nal_ref_idc = (num >> 5) & 0x03 // 参考优先级（0-3）
+  const nal_unit_type = num & 0x1f // NALU类型（1-31）
   return { forbidden_zero_bit, nal_ref_idc, nal_unit_type }
 }
 
@@ -29,7 +32,7 @@ export const getAmfType = (view: DataView, offset: number) => {
 }
 
 export const getAMFName = (view: DataView, offset: number, size: number) => {
-  const u8Array = new Int8Array(view.buffer, offset, size)
+  const u8Array = new Uint8Array(view.buffer.slice(offset, offset + size))
   const key = textDecoder?.decode(u8Array) || ''
   return key
 }
@@ -171,20 +174,18 @@ const getUint24 = (view: DataView, offset: number) => {
 
 // [0,1,2]字节
 export const getSignature = (view: DataView) => {
-  const u8Array = new Int8Array(view.buffer, 0, 3)
+  const u8Array = new Int8Array(view.buffer.slice(0, 3))
   return textDecoder?.decode(u8Array) || ''
 }
 
 // [3]字节
 export const getVersion = (view: DataView) => {
-  const u8Array = new Int8Array(view.buffer, 3, 1)
-  return u8Array[0]
+  return view.getUint8(3)
 }
 
 // [4]字节
 export const getFlags = (view: DataView) => {
-  const u8Array = new Int8Array(view.buffer, 4, 1)
-  const str = u8Array[0].toString(2).padStart(5, '0')
+  const str = view.getUint8(0).toString(2).padStart(5, '0')
   const arr = str.split('')
   const [, , video, , audio] = arr
 
@@ -196,7 +197,7 @@ export const getFlags = (view: DataView) => {
 
 // [5,6,7,8]字节
 export const getDataOffset = (view: DataView) => {
-  return view.getInt32(5)
+  return view.getUint32(5)
 }
 
 // [0,~,8]字节
@@ -228,13 +229,13 @@ export const isSurplusTag = (view: DataView, offset: number) => {
 
 // [0,1,2,3]字节
 export const getPreviousTagSize = (view: DataView, offset: number) => {
-  const size = view.getInt32(offset)
+  const size = view.getUint32(offset)
   return size
 }
 
 // [0]字节
 export const getTagType = (view: DataView, offset: number) => {
-  const num = view.getInt8(offset)
+  const num = view.getUint8(offset)
   let str: 'script' | 'audio' | 'video' | undefined
   switch (num) {
     case 18:
@@ -264,30 +265,13 @@ export const getTimestamp = (view: DataView, offset: number) => {
 
 // [7]字节
 export const getTimestampExtended = (view: DataView, offset: number) => {
-  return view.getInt8(offset + 7)
+  return view.getUint8(offset + 7)
 }
 
 // [8,9,10]字节
 export const getStreamID = (view: DataView, offset: number) => {
   const num = getUint24(view, offset + 8)
   return num
-}
-
-/**
- *
- * @param num number
- * @param origin_radix number
- * @param target_radix number default: 10
- */
-const convertRadix = (num: number, { origin_radix, target_radix }: { origin_radix: number; target_radix?: number }) => {
-  if (!target_radix) {
-    target_radix = 10
-  }
-  // 8进制(Number) => 8进制(字符串) => 10进制(数字) => 16进制(字符串) => 16进制(数字)
-  const radix_10_str = num.toString() // 转为字符串
-  const radix_10_num = Number.parseInt(radix_10_str, origin_radix) // 转为10进制数字
-  const radix_target_str = radix_10_num.toString(target_radix).padStart(4, '0x') // 转为目标进制字符串
-  return radix_target_str
 }
 
 export const parseMetaData = (view: DataView, offset: number, dataSize: number) => {
@@ -305,7 +289,7 @@ export const parseMetaData = (view: DataView, offset: number, dataSize: number) 
 
   // [3,size]字节 一般固定为 onMetaData
   {
-    const u8Array = new Int8Array(view.buffer, currentOffset, size)
+    const u8Array = new Int8Array(view.buffer.slice(currentOffset, currentOffset + size))
     const str = textDecoder?.decode(u8Array) || ''
     if (str !== 'onMetaData') throw new Error("Expected 'onMetaData' string")
     currentOffset = currentOffset + size
@@ -322,35 +306,38 @@ export const parseMetaData = (view: DataView, offset: number, dataSize: number) 
 }
 
 export const parseAudio = (view: DataView, offset: number, dataSize: number) => {
+  let currentOffset = offset
   // [0]
-  const num = view.getInt8(offset)
+  const num = view.getUint8(currentOffset)
   const soundFormat = (num >> 4) & 0x0f // 音频编码格式
   const soundRate = (num >> 2) & 0x03 // 采样率
   const soundSize = (num >> 1) & 0x01 // 采样位数
   const soundType = num & 0x01 // 声道模式
+  currentOffset = currentOffset + 1
+
+  const data = new Uint8Array(view.buffer.slice(currentOffset, currentOffset + dataSize))
 
   // soundFormat === 10 才存在
   if (soundFormat === 10) {
     // [1]
-    const accPacketType = view.getInt8(offset + 1)
-    const data = new Uint8Array(view.buffer, offset + 2, dataSize)
+    const accPacketType = view.getUint8(currentOffset)
+    currentOffset = currentOffset + 1
+
     return { soundFormat, soundRate, soundSize, soundType, accPacketType, data }
-  } else {
-    const data = new Uint8Array(view.buffer, offset + 1, dataSize)
-    return { soundFormat, soundRate, soundSize, soundType, data }
   }
+  return { soundFormat, soundRate, soundSize, soundType, data }
 }
 
 export const parseVideo = (view: DataView, offset: number, dataSize: number) => {
   let currentOffset = offset
   // [0]字节
-  const num = view.getInt8(currentOffset)
+  const num = view.getUint8(currentOffset)
   const frameType = (num >> 4) & 0x0f // 帧类型
   const codecID = num & 0x0f // 视频编码格式
   currentOffset = currentOffset + 1
 
   // [1]字节
-  const avcPacketType = view.getInt8(currentOffset) // AVC 包类型（仅 H.264）
+  const avcPacketType = view.getUint8(currentOffset) // AVC 包类型（仅 H.264）
   currentOffset = currentOffset + 1
 
   // [2,3,4]字节
@@ -358,7 +345,8 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
   currentOffset = currentOffset + 3
 
   // [5,dataSize]字节
-  const data = new Uint8Array(view.buffer, currentOffset, dataSize - 5)
+  const dataLength = dataSize - 5
+  const data = new Uint8Array(view.buffer.slice(currentOffset, currentOffset + dataLength))
 
   switch (codecID) {
     case 7: // H.264 AVCC
@@ -366,20 +354,20 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
         // config sps pps
         if (avcPacketType === 0) {
           // [0]字节 固定为1（H.264标准要求）
-          const version = view.getInt8(currentOffset)
+          const version = view.getUint8(currentOffset)
           currentOffset = currentOffset + 1
           if (version !== 1) throw new Error('Invalid AVC version')
 
           // [1]字节 编码档次（Profile），如0x64=High Profile、0x66=Baseline Profile
-          const profile = view.getInt8(currentOffset) & 0xff
+          const profile = view.getUint8(currentOffset) & 0xff
           currentOffset = currentOffset + 1
 
           // [2]字节 兼容性标志（与Profile配合使用）
-          const compatibility = view.getInt8(currentOffset) & 0xff
+          const compatibility = view.getUint8(currentOffset) & 0xff
           currentOffset = currentOffset + 1
 
           // [3]字节 编码级别（Level），如0x31=3.1 Level
-          const level = view.getInt8(currentOffset) & 0xff
+          const level = view.getUint8(currentOffset) & 0xff
           currentOffset = currentOffset + 1
 
           const arr = Array.from([profile, compatibility, level], (item) => item.toString(16).padStart(2, '0'))
@@ -387,7 +375,7 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
           const codec = `avc1.${str}`
 
           // [4]字节 低2位 NALU长度前缀的字节数减1（如0x03=4字节长度前缀）
-          const lengthSizeMinusOne = (view.getInt8(currentOffset) & 0x03) - 1
+          const lengthSizeMinusOne = (view.getUint8(currentOffset) & 0x03) - 1
           currentOffset = currentOffset + 1
 
           // [5]字节 低5位 SPS数量（通常为1）
@@ -395,29 +383,29 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
           currentOffset = currentOffset + 1
 
           // [6，7]字节 SPS的总长度（大端序）
-          const sequenceParameterSetLength = view.getInt16(currentOffset, false)
+          const sequenceParameterSetLength = view.getUint16(currentOffset, false)
           currentOffset = currentOffset + 2
 
           // [8,...sequenceParameterSetLength]字节 SPS数据（长度为sequenceParameterSetLength）
-          const sps = new Uint8Array(view.buffer, currentOffset, sequenceParameterSetLength)
+          const sps = new Uint8Array(view.buffer.slice(currentOffset, currentOffset + sequenceParameterSetLength))
           {
-            const obj = getNalInfo(view, currentOffset)
+            const obj = getNaluHeader(view, currentOffset)
             // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: sps`, obj)
           }
           currentOffset = currentOffset + sequenceParameterSetLength
 
           // [0]字节 低5位 PPS数量（通常为1）
-          const numOfPictureParameterSets = view.getInt8(currentOffset) & 0x1f
+          const numOfPictureParameterSets = view.getUint8(currentOffset) & 0x1f
           currentOffset = currentOffset + 1
 
           // [1,2]字节 PPS的总长度（大端序）
-          const pictureParameterSetLength = view.getInt16(currentOffset, false)
+          const pictureParameterSetLength = view.getUint16(currentOffset, false)
           currentOffset = currentOffset + 2
 
           // [3,...pictureParameterSetLength]字节	PPS数据（长度为pictureParameterSetLength）
-          const pps = new Uint8Array(view.buffer, currentOffset, pictureParameterSetLength)
+          const pps = new Uint8Array(view.buffer.slice(currentOffset, currentOffset + pictureParameterSetLength))
           {
-            const obj = getNalInfo(view, currentOffset)
+            const obj = getNaluHeader(view, currentOffset)
             // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: pps`, obj)
           }
           currentOffset = currentOffset + pictureParameterSetLength
@@ -426,60 +414,28 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
         }
         // video data
         else if (avcPacketType === 1) {
-          // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: data`, data)
-          const nalus = []
-
-          let startIndex = currentOffset
+          const nalus: Nalu[] = []
 
           const maxSize = currentOffset + dataSize - 5
 
-          // 查找为 00 00 03的结束码进行分割
           while (currentOffset + 4 < maxSize) {
-            // const isEnd = view.getInt8(currentOffset) === 0 && view.getInt8(currentOffset + 1) === 0 && view.getInt8(currentOffset + 2) === 0x03
-            const isNal = isNalStart(view, currentOffset)
-            currentOffset = currentOffset + isNal
+            // NALU长度
+            const size = view.getUint32(currentOffset, false)
+            currentOffset = currentOffset + 4
 
-            if (isNal) {
-              const obj = getNalInfo(view, currentOffset)
-              currentOffset = currentOffset + 1
-
-              if (obj.nal_unit_type === 6) {
-                let payloadType = 0
-                while (view.getInt8(currentOffset) === 0xff) {
-                  payloadType = payloadType + 0xff
-                  currentOffset = currentOffset + 1
-                }
-
-                let payloadSize = 0
-                while (view.getInt8(currentOffset) === 0xff) {
-                  payloadSize = payloadSize + 0xff
-                  currentOffset = currentOffset + 1
-                }
-
-                const payloadData = new Uint8Array(view.buffer.slice(currentOffset, payloadSize))
-                console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: ${payloadType}.${payloadSize}`, payloadData)
-              }
-            }
-
-            // if (isEnd) {
-            //   let _startIndex = startIndex
-            //   if (nalus.length !== 0) {
-            //     _startIndex = _startIndex + 3
-            //   }
-            //   const u8Array = new Uint8Array(view.buffer.slice(_startIndex, currentOffset))
-
-            //   // 判断是否为有效的 nalu头
-            //   const isEffective = u8Array[0] === 0x00 && u8Array[1] === 0x00
-            //   if (isEffective) {
-            //     const obj = getNalInfo(view, currentOffset + 4)
-            //     console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: obj`, obj.nal_unit_type)
-            //     nalus.push({ ...obj, payload: u8Array })
-            //   }
-            //   startIndex = currentOffset
-            // }
+            // NALU Header
+            const header = getNaluHeader(view, currentOffset)
             currentOffset = currentOffset + 1
+
+            const payloadLength = size - 1
+
+            const payload = new Uint8Array(view.buffer.slice(currentOffset, currentOffset + payloadLength))
+            currentOffset = currentOffset + payloadLength
+
+            nalus.push({ size, header, payload })
           }
-          // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->nalus: ${dataSize}`, nalus)
+
+          return { frameType, codecID, avcPacketType, cts, data, nalus }
         }
       }
       break

@@ -18,7 +18,9 @@
   "scripts": {
     "build": "tsc && vite build"
   },
-  "dependencies": {},
+  "dependencies": {
+    "protobufjs": "^7.5.4"
+  },
   "devDependencies": {
     "typescript": "^5.8.3",
     "vite": "^6.3.1",

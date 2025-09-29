@@ -10,23 +10,34 @@ export interface Header {
   dataOffset: number
 }
 
+export interface Nalu {
+  size: number
+  header: {
+    forbidden_zero_bit: number
+    nal_ref_idc: number
+    nal_unit_type: number
+  }
+  payload: Uint8Array
+}
+
 export interface TagBody {
-  script?: {
+  script: {
     [key: string]: any
   }
-  audio?: {
+  audio: {
     soundFormat: string
     soundRate: string
     soundSize: string
     soundType: string
     data: Uint8Array
   }
-  video?: {
+  video: {
     frameType: number
     codecID: number
     avcPacketType: number
     cts: number
     data: Uint8Array
+    nalus: Nalu[]
     version?: string
     codec?: string
   }
