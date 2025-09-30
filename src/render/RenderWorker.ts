@@ -10,8 +10,8 @@ export class Render {
     this.worker.postMessage({ action: 'setCut', data: cutOption })
   }
 
-  init = ({ offscreenCanvas }: { offscreenCanvas: OffscreenCanvas }) => {
-    this.worker.postMessage({ action: 'init', data: { offscreenCanvas } }, [offscreenCanvas])
+  init = (offscreenCanvas: OffscreenCanvas) => {
+    this.worker.postMessage({ action: 'init', data: offscreenCanvas }, [offscreenCanvas])
   }
 
   destroy = () => {

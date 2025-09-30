@@ -45,11 +45,15 @@ const init = async () => {
   video_dom.style.height = '100%'
   video_view.replaceChildren(video_dom)
 
-  const stream = await player.init({ canvas: canvas_dom })
-  video_dom.srcObject = stream
-  video_dom?.load()
-  await nextTick()
-  video_dom?.play()
+  player.init(canvas_dom)
+
+  const stream = player.getStream()
+  if (stream) {
+    video_dom.srcObject = stream
+    video_dom?.load()
+    await nextTick()
+    video_dom?.play()
+  }
 }
 
 const play = async () => {

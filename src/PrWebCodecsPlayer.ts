@@ -17,9 +17,6 @@ export class PrWebCodecsPlayer {
 
   stream: MediaStream | undefined
 
-  count = 0
-
-  onCut = (_key: string, _stream: MediaStream, _dw: number, _dh: number) => {}
   onSEI = (_payload: Uint8Array) => {}
 
   constructor() {}
@@ -33,8 +30,8 @@ export class PrWebCodecsPlayer {
     switch (tagType) {
       case 'script':
         {
-          const { width, height, fps } = body
-          this.initRender({ width, height, fps })
+          const { width, height } = body
+          this.initRender({ width, height })
         }
         break
       case 'video':
@@ -87,26 +84,29 @@ export class PrWebCodecsPlayer {
   /**
    * 初始化渲染器
    */
-  initRender = ({ width = 256, height = 256, fps = 25 } = {}) => {
+  initRender = ({ width = 256, height = 256 } = {}) => {
     if (!this.canvas) return
     this.canvas.width = width
     this.canvas.height = height
     const offscreenCanvas = this.canvas.transferControlToOffscreen()
-    this.renderWorker.init({ offscreenCanvas })
+    this.renderWorker.init(offscreenCanvas)
   }
 
   /**
    * 初始化
    */
-  init = async ({ canvas }: { canvas?: HTMLCanvasElement }) => {
+  init = (canvas?: HTMLCanvasElement) => {
     this.stop()
     this.initDemuxer()
     if (!canvas) {
       canvas = document.createElement('canvas')
     }
     this.canvas = canvas
+  }
+
+  getStream = (fps = 25) => {
     // 捕获画布流
-    this.stream = this.canvas.captureStream(25)
+    this.stream = this.canvas?.captureStream(fps)
     return this.stream
   }
 
@@ -118,20 +118,14 @@ export class PrWebCodecsPlayer {
       const res = await this.prFetch.request(url)
       const reader = res.body?.getReader()
       if (!reader) throw new Error('Reader is error.')
-      this.count = 0
       while (true) {
         const { done, value } = await reader.read()
         if (value) {
-          this.count = this.count + 1
           this.demuxerWorker.push(value)
         }
 
         if (done) {
           break
-        }
-
-        if (this.count >= 18) {
-          // break
         }
       }
     } catch (error) {

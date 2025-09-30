@@ -17,7 +17,7 @@ export class Render {
     this.cutOption = { ...this.cutOption, ...cutOption }
   }
 
-  init = ({ offscreenCanvas }: { offscreenCanvas: OffscreenCanvas }) => {
+  init = (offscreenCanvas: OffscreenCanvas) => {
     this.destroy()
     this.offscreenCanvas = offscreenCanvas
     this.ctx = this.offscreenCanvas.getContext('2d')
@@ -38,13 +38,13 @@ export class Render {
     }
   }
 
-  calculateTimeUntilNextFrame = (timestamp: number) => {
+  private calculateTimeUntilNextFrame = (timestamp: number) => {
     if (this.baseTime == 0) this.baseTime = performance.now()
     let mediaTime = performance.now() - this.baseTime
     return Math.max(0, timestamp / 1000 - mediaTime)
   }
 
-  renderFrame = async () => {
+  private renderFrame = async () => {
     if (!this.ctx || !this.offscreenCanvas) return
     const frame = this.pendingFrames.shift()
 
