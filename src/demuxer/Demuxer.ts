@@ -91,7 +91,7 @@ export class Demuxer {
       switch (tagType) {
         case 'script':
           {
-            tagBody = flvParser.tag.tagBody.parseMetaData(view, offset, dataSize)
+            tagBody = flvParser.tag.tagBody.parseMetaData(view, offset)
           }
           break
         case 'audio':
