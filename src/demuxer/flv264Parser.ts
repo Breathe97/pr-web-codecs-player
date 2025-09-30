@@ -388,10 +388,6 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
 
           // [8,...sequenceParameterSetLength]字节 SPS数据（长度为sequenceParameterSetLength）
           const sps = new Uint8Array(view.buffer.slice(currentOffset, currentOffset + sequenceParameterSetLength))
-          {
-            const obj = getNaluHeader(view, currentOffset)
-            // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: sps`, obj)
-          }
           currentOffset = currentOffset + sequenceParameterSetLength
 
           // [0]字节 低5位 PPS数量（通常为1）
@@ -404,10 +400,6 @@ export const parseVideo = (view: DataView, offset: number, dataSize: number) => 
 
           // [3,...pictureParameterSetLength]字节	PPS数据（长度为pictureParameterSetLength）
           const pps = new Uint8Array(view.buffer.slice(currentOffset, currentOffset + pictureParameterSetLength))
-          {
-            const obj = getNaluHeader(view, currentOffset)
-            // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: pps`, obj)
-          }
           currentOffset = currentOffset + pictureParameterSetLength
 
           return { frameType, codecID, avcPacketType, cts, data, version, codec, profile, compatibility, level, lengthSizeMinusOne, numOfSequenceParameterSets, sequenceParameterSetLength, sps, numOfPictureParameterSets, pictureParameterSetLength, pps }

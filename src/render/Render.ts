@@ -1,14 +1,6 @@
-interface CutOption {
-  key: string
-  dx: number
-  dy: number
-  dw: number
-  dh: number
-  offscreenCanvas: OffscreenCanvas
-  ctx: OffscreenCanvasRenderingContext2D
-}
+import { CutOption } from './type'
 
-export class CanvasRender {
+export class Render {
   private isRendering = false
   private pendingFrames: { img: ImageBitmap; timestamp: number }[] = []
   private baseTime = 0
@@ -17,19 +9,12 @@ export class CanvasRender {
 
   private ctx: OffscreenCanvasRenderingContext2D | null | undefined
 
-  debug = false
-
-  private cutMap = new Map<string, CutOption>()
+  private cutOption: CutOption = {}
 
   constructor() {}
 
-  setCut = async (cutOption: Omit<CutOption, 'ctx'>) => {
-    const { key, offscreenCanvas } = cutOption
-
-    const ctx = offscreenCanvas.getContext('2d')
-    if (!ctx) return
-
-    this.cutMap.set(key, { ...cutOption, ctx })
+  setCut = async (cutOption: CutOption) => {
+    this.cutOption = { ...this.cutOption, ...cutOption }
   }
 
   init = ({ offscreenCanvas }: { offscreenCanvas: OffscreenCanvas }) => {
@@ -47,7 +32,6 @@ export class CanvasRender {
   }
 
   push = (frame: { img: ImageBitmap; timestamp: number }) => {
-    // console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->frame: ${frame.timestamp}`, frame.img)
     this.pendingFrames.push(frame)
     if (this.isRendering === false) {
       setTimeout(this.renderFrame, 0)
@@ -73,20 +57,15 @@ export class CanvasRender {
     this.isRendering = true
     const { img, timestamp } = frame
 
+    const { sx = 0, sy = 0, sw = img.width, sh = img.height } = this.cutOption
+    const cutImg = await createImageBitmap(img, sx, sy, sw, sh)
+
     const timeUntilNextFrame = this.calculateTimeUntilNextFrame(timestamp)
     await new Promise((r) => setTimeout(r, timeUntilNextFrame))
-    this.ctx.drawImage(img, 0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height)
-    // 绘制剪切
-    {
-      const cuts = [...this.cutMap.values()]
-      for (const cut of cuts) {
-        const { ctx, dx, dy, dw, dh, offscreenCanvas } = cut
-        const cutImg = await createImageBitmap(img, dx, dy, dw, dh)
-        ctx.drawImage(cutImg, 0, 0, offscreenCanvas.width, offscreenCanvas.height)
-      }
-    }
+    this.ctx.drawImage(cutImg, 0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height)
 
     img.close()
+    cutImg.close()
     setTimeout(this.renderFrame, 0)
   }
 }

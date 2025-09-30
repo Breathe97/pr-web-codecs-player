@@ -1,28 +1,17 @@
 import { Demuxer } from './Demuxer'
 
-const demuxer = new Demuxer({
-  onHeader: (data) => postMessage({ action: 'onHeader', data }),
-  onTag: (data) => postMessage({ action: 'onTag', data }),
-  debug: false
-})
+interface WorkerMessage {
+  action: 'init' | 'destroy' | 'push'
+  data: any
+}
 
-onmessage = (event) => {
+const demuxer = new Demuxer()
+
+demuxer.onHeader = (data) => postMessage({ action: 'onHeader', data })
+demuxer.onTag = (data) => postMessage({ action: 'onTag', data })
+
+onmessage = (event: MessageEvent<WorkerMessage>) => {
   const { action, data } = event.data
-  switch (action) {
-    case 'init':
-      {
-        demuxer.init()
-      }
-      break
-    case 'destroy':
-      {
-        demuxer.destroy()
-      }
-      break
-    case 'push':
-      {
-        demuxer.push(data)
-      }
-      break
-  }
+  const func = demuxer[action]
+  func && func(data)
 }

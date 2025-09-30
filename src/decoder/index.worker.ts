@@ -1,32 +1,17 @@
-import { WCSDecoder } from './WCSDecoder'
+import { Decoder } from './Decoder'
 
-const decoder = new WCSDecoder({
-  onDecode: (data) => postMessage({ action: 'onDecode', data }),
-  onError: (data) => postMessage({ action: 'onError', data })
-})
+interface WorkerMessage {
+  action: 'init' | 'destroy' | 'decode' | 'flush'
+  data: any
+}
 
-onmessage = (event) => {
+const decoder = new Decoder()
+
+decoder.onDecode = (data) => postMessage({ action: 'onDecode', data })
+decoder.onError = (data) => postMessage({ action: 'onError', data })
+
+onmessage = (event: MessageEvent<WorkerMessage>) => {
   const { action, data } = event.data
-  switch (action) {
-    case 'init':
-      {
-        decoder.init(data)
-      }
-      break
-    case 'destroy':
-      {
-        decoder.destroy()
-      }
-      break
-    case 'decode':
-      {
-        decoder.decode(data)
-      }
-      break
-    case 'flush':
-      {
-        decoder.decode(data)
-      }
-      break
-  }
+  const func = decoder[action]
+  func && func(data)
 }

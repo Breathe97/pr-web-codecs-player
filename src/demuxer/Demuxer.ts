@@ -1,7 +1,8 @@
 import flvParser from './flv264Parser'
-import { Header, Options, TagType } from './type'
+import { Header, Tag, TagType } from './type'
 
 export class Demuxer {
+  private parseTimer = 0
   private pushFuncs: Function[] = []
   private payload = new Uint8Array(0)
   private offset = 0
@@ -9,18 +10,10 @@ export class Demuxer {
   private header: Header | undefined
   private tag: any
 
-  private onHeader
-  private onTag
+  onHeader = (_header: Header) => {}
+  onTag = (_tag: Tag<'script' & 'audio' & 'video'>) => {}
 
-  debug = false
-
-  parseTimer = 0
-
-  constructor({ onHeader, onTag, debug = false }: Options) {
-    this.onHeader = onHeader
-    this.onTag = onTag
-    this.debug = debug
-  }
+  constructor() {}
 
   init = () => {
     this.destroy()
