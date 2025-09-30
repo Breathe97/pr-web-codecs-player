@@ -1,8 +1,8 @@
-import { PrFetch } from './PrFetch'
 import DemuxerWorker from './demuxer/index.worker.ts?worker'
 import DecoderWorker from './decoder/index.worker.ts?worker'
 import RenderWorker from './render/index.worker.ts?worker'
 import { Header, TagBody } from './demuxer/type'
+import { PrFetch } from 'pr-fetch'
 
 export class PrWebCodecsPlayer {
   url: string | undefined
@@ -167,7 +167,7 @@ export class PrWebCodecsPlayer {
    */
   start = async (url: string) => {
     try {
-      const res = await this.prFetch.get(url)
+      const res = await this.prFetch.request(url)
       const reader = res.body?.getReader()
       if (!reader) throw new Error('Reader is error.')
       this.count = 0
