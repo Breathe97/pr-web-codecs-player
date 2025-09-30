@@ -1,7 +1,7 @@
 import Worker from './index.worker.ts?worker&inline' // 在生产环境中，可能会遇到 MIME type is text/html 的错误。可以通过添加 ?inline 参数避免单独生成 Worker 文件。
 import { Header, Tag } from './type'
 
-export class Demuxer {
+export class DemuxerWorker {
   worker = new Worker()
 
   onHeader = (_header: Header) => {}

@@ -1,6 +1,6 @@
-import { Demuxer as DemuxerWorker } from './demuxer/DemuxerWorker'
-import { Decoder as DecoderWorker } from './decoder/DecoderWorker'
-import { Render as RenderWorker } from './render/RenderWorker'
+import { DemuxerWorker } from './demuxer/DemuxerWorker'
+import { DecoderWorker } from './decoder/DecoderWorker'
+import { RenderWorker } from './render/RenderWorker'
 
 import { PrFetch } from 'pr-fetch'
 
