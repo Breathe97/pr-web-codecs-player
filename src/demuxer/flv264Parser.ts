@@ -274,7 +274,7 @@ export const getStreamID = (view: DataView, offset: number) => {
   return num
 }
 
-export const parseMetaData = (view: DataView, offset: number, dataSize: number) => {
+export const parseMetaData = (view: DataView, offset: number) => {
   let currentOffset = offset
   // [0]字节
   {
