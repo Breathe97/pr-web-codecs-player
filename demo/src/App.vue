@@ -22,7 +22,9 @@
 </template>
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
-import { PrWebCodecsPlayer } from '../../src/PrWebCodecsPlayer.ts'
+// import { PrWebCodecsPlayer } from '../../src/PrWebCodecsPlayer.ts'
+import { PrWebCodecsPlayer } from '../../dist/index'
+// import { PrWebCodecsPlayer } from 'pr-web-codecs-player'
 
 const url = ref('https://sf1-cdn-tos.huoshanstatic.com/obj/media-fe/xgplayer_doc_video/flv/xgplayer-demo-720p.flv')
 

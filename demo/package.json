@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "pr-web-codecs-player": "^0.0.3",
     "vue": "^3.5.13"
   },
   "devDependencies": {
