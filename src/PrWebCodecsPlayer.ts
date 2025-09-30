@@ -69,6 +69,7 @@ export class PrWebCodecsPlayer {
 
   /**
    * 初始化解码器
+   * @param config: VideoDecoderConfig
    */
   initDecoder = (config: VideoDecoderConfig) => {
     this.decoderWorker.init(config)
@@ -83,6 +84,8 @@ export class PrWebCodecsPlayer {
 
   /**
    * 初始化渲染器
+   * @param { width = 256, height = 256 } = {}
+   * @returns
    */
   initRender = ({ width = 256, height = 256 } = {}) => {
     if (!this.canvas) return
@@ -94,6 +97,7 @@ export class PrWebCodecsPlayer {
 
   /**
    * 初始化
+   * @param canvas?: HTMLCanvasElement
    */
   init = (canvas?: HTMLCanvasElement) => {
     this.stop()
@@ -104,7 +108,11 @@ export class PrWebCodecsPlayer {
     this.canvas = canvas
   }
 
-  getStream = (fps = 25) => {
+  /**
+   * 获取媒体流
+   * @param fps : number = 25
+   */
+  getStream = (fps: number = 25) => {
     // 捕获画布流
     this.stream = this.canvas?.captureStream(fps)
     return this.stream
@@ -112,6 +120,7 @@ export class PrWebCodecsPlayer {
 
   /**
    * 开始播放
+   * @param url : string
    */
   start = async (url: string) => {
     try {

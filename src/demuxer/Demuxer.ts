@@ -18,7 +18,6 @@ export class Demuxer {
 
   init = () => {
     this.destroy()
-    // @ts-ignore
     this.parseTimer = setInterval(this.parse, this.parseSpeed)
   }
 
