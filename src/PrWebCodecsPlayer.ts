@@ -78,6 +78,10 @@ export class PrWebCodecsPlayer {
 
   count = 0
 
+  cutMap = new Map<string, { dx: number; dy: number; dw: number; dh: number; canvas: HTMLCanvasElement; stream: MediaStream }>()
+
+  onCut = (key: string, stream: MediaStream, dw: number, dh: number) => {}
+
   constructor() {}
 
   /**
@@ -109,6 +113,7 @@ export class PrWebCodecsPlayer {
           }
           if (avcPacketType === 1) {
             const type = frameType === 1 ? 'key' : 'delta'
+            this.decoderWorker.postMessage({ action: 'decode', data: { type, timestamp, data } })
 
             for (const nalu of nalus) {
               const { header, payload } = nalu
@@ -119,11 +124,21 @@ export class PrWebCodecsPlayer {
 
                 // 布局事件
                 if (res?.event === 0) {
-                  console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: res`, res)
+                  const { data } = res
+                  // @ts-ignore
+                  const { userMap } = data
+                  const users = [...Object.values(userMap)]
+                  for (const user of users) {
+                    // @ts-ignore
+                    const { id, videos = [] } = user
+                    for (const video of videos) {
+                      const { x, y, width, height } = video
+                      this.addCut(id, x, y, width, height)
+                    }
+                  }
                 }
               }
             }
-            this.decoderWorker.postMessage({ action: 'decode', data: { type, timestamp, data } })
           }
         }
         break
@@ -135,6 +150,30 @@ export class PrWebCodecsPlayer {
    */
   onDecode = (e: any) => {
     this.renderWorker.postMessage({ action: 'push', data: e })
+  }
+
+  addCut = async (key: string, dx: number, dy: number, dw: number, dh: number) => {
+    const had = () => {
+      const info = this.cutMap.get(key)
+      if (info && info.dw === dw && info.dh === dh && info.dx === dx && info.dy === dy) return true
+      return false
+    }
+
+    const isHad = had()
+
+    // 检查是否已经存在
+    if (isHad) return
+
+    const canvas = document.createElement('canvas')
+    canvas.width = dw
+    canvas.height = dh
+
+    const offscreenCanvas = canvas.transferControlToOffscreen()
+    this.renderWorker.postMessage({ action: 'setCut', data: { key, dx, dy, dw, dh, offscreenCanvas } }, [offscreenCanvas])
+    // 捕获画布流
+    const stream = canvas.captureStream(25)
+    this.cutMap.set(key, { dw, dh, dx, dy, canvas, stream })
+    this.onCut(key, stream, dw, dh)
   }
 
   /**

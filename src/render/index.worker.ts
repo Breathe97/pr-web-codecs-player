@@ -1,8 +1,6 @@
 import { CanvasRender } from './CanvasRender'
 
-const render = new CanvasRender({
-  debug: false
-})
+const render = new CanvasRender()
 
 onmessage = (event) => {
   const { action, data } = event.data
@@ -20,6 +18,11 @@ onmessage = (event) => {
     case 'push':
       {
         render.push(data)
+      }
+      break
+    case 'setCut':
+      {
+        render.setCut(data)
       }
       break
   }

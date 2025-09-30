@@ -2,8 +2,7 @@ import { WCSDecoder } from './WCSDecoder'
 
 const decoder = new WCSDecoder({
   onDecode: (data) => postMessage({ action: 'onDecode', data }),
-  onError: (data) => postMessage({ action: 'onError', data }),
-  debug: false
+  onError: (data) => postMessage({ action: 'onError', data })
 })
 
 onmessage = (event) => {
