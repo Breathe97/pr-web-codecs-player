@@ -27,11 +27,11 @@
 </template>
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
-import { PrWebCodecsPlayer } from '../../src/PrWebCodecsPlayer.ts'
+import { QuickVoPlayer } from '../../src/QuickVoPlayer.ts'
 
 const url = ref('https://sf1-cdn-tos.huoshanstatic.com/obj/media-fe/xgplayer_doc_video/flv/xgplayer-demo-720p.flv')
 
-const player = new PrWebCodecsPlayer()
+const player = new QuickVoPlayer()
 
 player.onCut = async (key, stream, width, heiht) => {
   console.log('\x1b[38;2;0;151;255m%c%s\x1b[0m', 'color:#0097ff;', `------->Breathe: stream`, stream)
